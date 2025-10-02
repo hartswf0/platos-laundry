@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Plato's Laundry — Cave Apparatus</title>
+  <meta name="description" content="A mobile-first Three.js portal that reads as a machine while evoking Plato's Cave: flame light, shadows, and diegetic controls." />
+  <style>
+    :root{
+      /* Cave + machine palette */
+      --bg:#090a0c; --rock:#0f1217; --metal:#2a2e38; --metal-hi:#4a5160; --glass:#7bdfff;
+      --ink:#e8f4ff; --muted:#9ab0c5; --accent:#46e2c2; --ember:#ff7a1a; --rose:#ff2d6d;
+      --ring:#94a3b8; --shadow:rgba(0,0,0,.6);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:
+      radial-gradient(140% 100% at 50% 0%, #0d1117 0%, var(--bg) 62%, #05070a 100%);
+      color:var(--ink);font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "IBM Plex Mono", monospace;
+      overflow:hidden;
+    }
+
+    /* ——— HERO ——— */
+    #hero{position:fixed;inset:0;display:grid;place-items:center;z-index:50;
+      background:
+      radial-gradient(90% 60% at 50% 65%, rgba(255,180,90,.08), transparent 60%),
+      radial-gradient(30% 40% at 50% 30%, rgba(80,180,255,.10), transparent 60%),
+      linear-gradient(180deg, #0a0e13 0%, #07090c 100%);
+      transition:opacity .9s ease;
+    }
+    #hero.hidden{opacity:0;pointer-events:none}
+    .brand{display:flex;flex-direction:column;align-items:center;gap:.6rem;text-align:center}
+    .title{letter-spacing:.35em;text-transform:uppercase;font-weight:800;
+      font-size:min(13vw,4rem);
+      background:linear-gradient(35deg, var(--glass), #8a6cff 40%, var(--rose));
+      -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+      text-shadow:0 0 28px rgba(70,226,194,.25);
+    }
+    .subtitle{letter-spacing:.22em;color:var(--muted);font-size:.9rem}
+    .cta{margin-top:1.25rem; padding:.9rem 1.25rem; border-radius:999px;
+      text-transform:uppercase; letter-spacing:.22em; font-weight:700; cursor:pointer;
+      border:1px solid var(--ring); background:linear-gradient(145deg,#10141b,#0b0f14);
+      box-shadow:0 6px 26px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05);
+      color:var(--ink); transition:transform .25s ease, box-shadow .25s ease;
+    }
+    .cta:hover{transform:translateY(-2px); box-shadow:0 10px 36px rgba(0,0,0,.55), 0 0 24px rgba(70,226,194,.25)}
+
+    /* ——— SCENE ——— */
+    #stage{position:fixed; inset:0}
+
+    /* diegetic projection bay (now absolutely pixel-positioned to track the 3D drum) */
+    .portal{position:absolute; left:0; top:0; width:0; height:0; z-index:20; pointer-events:none}
+    #proc, .videoWrap{position:absolute; border-radius:50%; left:0; top:0; width:100%; height:100%;}
+    #proc{filter:blur(.15px); opacity:.96; transition:opacity .6s ease}
+    #proc.hidden{opacity:0}
+    .videoWrap{overflow:hidden; opacity:0; transition:opacity .6s ease}
+    .videoWrap.visible{opacity:1}
+    .videoWrap iframe{position:absolute; inset:0; width:100%; height:100%; border:0}
+
+    /* play glyph */
+    .glyph{position:absolute; left:0; top:0; width:0; height:0; transform:translate(0,0); z-index:25; pointer-events:none}
+    .glyph > .hit{position:absolute; left:0; top:0; border-radius:50%; border:3px solid rgba(255,255,255,.85);
+      background:rgba(10,12,16,.45); backdrop-filter:blur(10px); display:grid; place-items:center; cursor:pointer;
+      box-shadow:0 8px 34px rgba(0,0,0,.45); transition:transform .25s ease, opacity .4s ease; pointer-events:auto}
+    .glyph.hidden .hit{opacity:0; pointer-events:none; transform:scale(.9)}
+    .glyph .hit:after{content:""; width:0; height:0; border-left:28px solid rgba(255,255,255,.9);
+      border-top:18px solid transparent; border-bottom:18px solid transparent; margin-left:6px}
+
+    /* ——— CONTROL PANEL ——— */
+    .panel{position:fixed; left:50%; bottom:clamp(10px,6vh,38px); transform:translateX(-50%);
+      display:grid; gap:.75rem; width:min(92vw,720px); z-index:40;
+      opacity:0; transition:opacity .9s ease .3s
+    }
+    .panel.visible{opacity:1}
+    .panel-head{display:flex; align-items:center; justify-content:space-between;
+      padding:.6rem .9rem; border:1px solid #2a313d; border-radius:14px;
+      background:linear-gradient(145deg,#10141b,#0b0f14); color:var(--muted);
+      box-shadow:0 8px 26px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05)
+    }
+    .panel-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:.5rem}
+    @media (max-width:760px){ .panel-grid{grid-template-columns:repeat(3,1fr)} }
+    .btn{padding:.8rem .7rem; border-radius:10px; border:1px solid #3a4352; background:linear-gradient(145deg,#1a2230,#121923);
+      color:#cfe7ff; text-transform:uppercase; letter-spacing:.14em; font-size:.7rem; font-weight:700; cursor:pointer; transition:all .25s ease; box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 6px 14px rgba(0,0,0,.35)}
+    .btn:hover{border-color:#6ddad0; color:#fff}
+    .btn.active{background:linear-gradient(145deg,#6ee7e6,#38c7b8); color:#001418; border-color:#6ee7e6; box-shadow:0 0 22px rgba(110,231,230,.35), inset 0 2px 6px rgba(255,255,255,.35)}
+    .status{font-family:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.68rem; color:#8aa6c6}
+    .quote{ text-align:center; font-style:italic; font-size:.72rem; color:#7d8da4 }
+
+    /* subtle vignette + film dust overlay */
+    .vignette{pointer-events:none; position:fixed; inset:0; background:
+      radial-gradient(120% 85% at 50% 45%, transparent 55%, rgba(0,0,0,.35) 100%),
+      radial-gradient(30% 30% at 50% 70%, rgba(255,120,40,.04), transparent 60%)}
+  </style>
+</head>
+<body>
+
+  <!-- ——— HERO ——— -->
+  <section id="hero" aria-label="Intro">
+    <div class="brand">
+      <div class="title">PLATO'S LAUNDRY</div>
+      <div class="subtitle">cave • machine • light • shadow</div>
+      <button id="enter" class="cta" aria-label="Enter the Apparatus">Enter the Apparatus</button>
+    </div>
+  </section>
+
+  <!-- ——— STAGE / THREE ——— -->
+  <div id="stage" role="presentation"></div>
+
+  <!-- ——— DIEGETIC PORTAL (procedural / video) ——— -->
+  <div id="portal" class="portal" aria-hidden="true">
+    <canvas id="proc"></canvas>
+    <div id="videoWrap" class="videoWrap">
+      <iframe id="tube" title="Projection" src="https://www.youtube.com/embed/5kzEYQRVnIc?autoplay=0&mute=1&loop=1&playlist=5kzEYQRVnIc&controls=0&modestbranding=1&rel=0&enablejsapi=1" allow="autoplay; encrypted-media"></iframe>
+    </div>
+  </div>
+  <div id="glyph" class="glyph"><div class="hit"></div></div>
+
+  <!-- ——— PANEL ——— -->
+  <div id="panel" class="panel">
+    <div class="panel-head">
+      <div class="status" id="status">Status: Initializing</div>
+      <div class="status" id="cycle">Cycle: Wash</div>
+    </div>
+    <div class="panel-grid">
+      <button class="btn" data-mode="wash">Wash</button>
+      <button class="btn" data-mode="rinse">Rinse</button>
+      <button class="btn" data-mode="spin">Spin</button>
+      <button class="btn" data-mode="dry">Dry</button>
+      <button id="toggle" class="btn">Play</button>
+    </div>
+    <div class="quote">“Not escape, but authorship of light.”</div>
+  </div>
+
+  <div class="vignette" aria-hidden="true"></div>
+
+  <!-- Robust loader: fetch THREE from multiple CDNs before booting -->
+  <script>
+  (function ensureThree(){
+    const urls = [
+      "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+      "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js",
+      "https://unpkg.com/three@0.128.0/build/three.min.js"
+    ];
+    let i = 0;
+    function next(){
+      if (window.THREE) return boot();
+      if (i >= urls.length){
+        const s = document.getElementById('status');
+        if (s) s.textContent = 'Error: THREE failed to load';
+        console.error('Three.js failed to load from all CDNs.');
+        return;
+      }
+      const el = document.createElement('script');
+      el.src = urls[i++];
+      el.async = true;
+      el.onload = () => window.THREE ? boot() : next();
+      el.onerror = next;
+      document.head.appendChild(el);
+    }
+    next();
+  })();
+
+  function boot(){
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+    else start();
+  }
+
+  function start(){
+    // ——— SELF-TESTS (basic) ———
+    console.assert(typeof THREE !== 'undefined', 'Test[1] THREE should be defined');
+
+    // ——— STATE ———
+    const S = { mode:'wash', playing:false, spin:0.32, wobble:0.45, t:0 };
+
+    // cache DOM
+    const stage = document.getElementById('stage');
+    const hero = document.getElementById('hero');
+    const enterBtn = document.getElementById('enter');
+    const panel = document.getElementById('panel');
+    const statusEl = document.getElementById('status');
+    const cycleEl = document.getElementById('cycle');
+    const glyph = document.getElementById('glyph');
+    const glyphHit = glyph.querySelector('.hit');
+    const portal = document.getElementById('portal');
+    const videoWrap = document.getElementById('videoWrap');
+    const tube = document.getElementById('tube');
+
+    // ——— THREE SETUP ———
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x090a0c, 0.036);
+
+    const camera = new THREE.PerspectiveCamera( 48, window.innerWidth/window.innerHeight, 0.1, 120 );
+    camera.position.set(0, 0.6, 13);
+
+    const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+    renderer.setPixelRatio(window.devicePixelRatio || 1);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    stage.appendChild(renderer.domElement);
+
+    // self-test 2: renderer instance
+    console.assert(renderer instanceof THREE.WebGLRenderer, 'Test[2] Renderer should be a THREE.WebGLRenderer');
+
+    // ——— LIGHTING (CAVE + FLAME) ———
+    const ambient = new THREE.AmbientLight(0x0e141a, 0.55); scene.add(ambient);
+
+    const moon = new THREE.DirectionalLight(0xcfe7ff, 0.55);
+    moon.position.set(-6, 7, 8); moon.castShadow = true;
+    moon.shadow.mapSize.set(1024,1024); scene.add(moon);
+
+    // flame cluster: warm flicker + volumetric cone
+    const flame = new THREE.PointLight(0xff7a1a, 1.6, 24, 2.2);
+    flame.position.set(0, -1.0, -4.2); scene.add(flame);
+
+    const coneGeo = new THREE.ConeGeometry(3.2, 9.6, 48, 1, true);
+    const coneMat = new THREE.MeshBasicMaterial({ color:0xff7a1a, transparent:true, opacity:0.06, side:THREE.DoubleSide, blending:THREE.AdditiveBlending });
+    const cone = new THREE.Mesh(coneGeo, coneMat);
+    cone.position.copy(flame.position); cone.rotation.x = Math.PI; scene.add(cone);
+
+    // ——— MACHINE: washer portal ———
+    const machine = new THREE.Group(); scene.add(machine);
+
+    const matMetal = new THREE.MeshStandardMaterial({ color:0x2a2e38, metalness:0.88, roughness:0.28 });
+    const matMetalHi = new THREE.MeshStandardMaterial({ color:0x4a5160, metalness:1.0, roughness:0.12 });
+    const matDrum = new THREE.MeshStandardMaterial({ color:0x0a0c0f, metalness:0.55, roughness:0.82 });
+    const matGlass = new THREE.MeshPhysicalMaterial({ color:0x7bdfff, transmission:0.96, opacity:0.34, roughness:0.06, metalness:0.1, clearcoat:1, clearcoatRoughness:0.12, transparent:true, side:THREE.DoubleSide });
+
+    const outer = new THREE.Mesh(new THREE.TorusGeometry(3.6, 0.30, 16, 96), matMetalHi); outer.castShadow = true; machine.add(outer);
+    const mid = new THREE.Mesh(new THREE.TorusGeometry(2.95, 0.22, 16, 80), matMetal); mid.position.z = 0.26; mid.castShadow = true; machine.add(mid);
+    const glass = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 0.34, 72), matGlass); glass.rotation.x = Math.PI/2; glass.position.z = 0.12; machine.add(glass);
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(2.35, 2.35, 0.6, 72), matDrum); drum.rotation.x = Math.PI/2; drum.position.z = -0.52; drum.receiveShadow = true; machine.add(drum);
+
+    // struts
+    for(let i=0;i<10;i++){
+      const a = i/10*Math.PI*2; const r=3.25;
+      const strut = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.1,1.05), matMetal);
+      strut.position.set(Math.cos(a)*r, Math.sin(a)*r, -0.26); strut.castShadow = true; machine.add(strut);
+    }
+
+    // dust motes in beam
+    const motes = new THREE.Group();
+    const moteG = new THREE.SphereGeometry(0.02, 8, 8);
+    const moteM = new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:0.6 });
+    for(let i=0;i<110;i++){
+      const m = new THREE.Mesh(moteG, moteM);
+      m.position.set((Math.random()-0.5)*4, (Math.random()-0.5)*4, (Math.random()-0.5)*2 - 1.2);
+      m.userData = { vx:(Math.random()-0.5)*0.015, vy:(Math.random()-0.5)*0.015, vz:(Math.random()-0.5)*0.007 };
+      motes.add(m);
+    } machine.add(motes);
+
+    // back wall (cave face)
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(34,22), new THREE.MeshStandardMaterial({ color:0x0c0f14, roughness:1, metalness:0 }));
+    wall.position.z = -10; wall.receiveShadow = true; scene.add(wall);
+
+    // silhouette puppets (shadow theatre) — toned down
+    const puppetMat = new THREE.MeshStandardMaterial({ color:0x0a0c10, metalness:0, roughness:1 });
+    function puppet(x,y,s){ const g = new THREE.ExtrudeGeometry(new THREE.Shape([
+        new THREE.Vector2(-.6,0), new THREE.Vector2(-.2,.9), new THREE.Vector2(.2,.9), new THREE.Vector2(.6,0), new THREE.Vector2(.2,-.9), new THREE.Vector2(-.2,-.9)
+      ]), { depth:.2, bevelEnabled:false }); const mesh=new THREE.Mesh(g,puppetMat); mesh.position.set(x,y,-9.4); mesh.scale.setScalar(s); mesh.castShadow=true; return mesh; }
+    const p1 = puppet(-4.2,-1.0, .7), p2 = puppet(3.6,-.6, .9); scene.add(p1,p2);
+
+    // ——— PROCEDURAL PORTAL (2D canvas) ———
+    const proc = document.getElementById('proc');
+    const ctx = proc.getContext('2d');
+    function resizeProc(px){ proc.width = px; proc.height = px; }
+
+    let time = 0;
+    function drawPortal(){
+      const w = proc.width, h = proc.height, cx = w/2, cy = h/2; time += 0.02;
+      ctx.clearRect(0,0,w,h);
+      // smoky base
+      ctx.fillStyle = 'rgba(5,7,10,0.9)'; ctx.fillRect(0,0,w,h);
+      // reduced spokes for less busyness
+      for(let i=0;i<5;i++){
+        const ang = time*0.45 + i*Math.PI*2/5; const rad = 0.34*w + Math.sin(time*1.8+i)*16;
+        ctx.save(); ctx.translate(cx,cy); ctx.rotate(ang);
+        const g = ctx.createLinearGradient(-100,-60,100,60);
+        g.addColorStop(0, `hsla(${(time*50+i*60)%360},70%,58%,0.16)`);
+        g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g;
+        ctx.fillRect(-rad/2, -14, rad, 28);
+        ctx.restore();
+      }
+      // pulsing cave flame halo
+      const pr = 80 + Math.sin(time*2.6)*22;
+      const grad = ctx.createRadialGradient(cx, cy, 4, cx, cy, pr*2.1);
+      grad.addColorStop(0, 'rgba(255,122,26,0.22)'); grad.addColorStop(1,'rgba(255,122,26,0)');
+      ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(cx, cy, pr*2.1, 0, Math.PI*2); ctx.fill();
+    }
+
+    // ——— OVERLAY ALIGNMENT ———
+    const overlay = { sizePx: 0, center: new THREE.Vector3(), right: new THREE.Vector3(1,0,0) };
+    function updateOverlay(){
+      // 3D points: center of glass & a point on its rim in local space
+      const centerLocal = new THREE.Vector3(0,0,0.12); // the glass mesh center
+      const rimLocal = new THREE.Vector3(2.6,0,0.12);  // x-offset by glass radius
+      const centerWorld = glass.localToWorld(centerLocal.clone());
+      const rimWorld = glass.localToWorld(rimLocal.clone());
+
+      // project to NDC
+      const centerNDC = centerWorld.clone().project(camera);
+      const rimNDC = rimWorld.clone().project(camera);
+
+      // map to screen px
+      const cx = (centerNDC.x * 0.5 + 0.5) * window.innerWidth;
+      const cy = (-centerNDC.y * 0.5 + 0.5) * window.innerHeight;
+      const rx = (rimNDC.x * 0.5 + 0.5) * window.innerWidth;
+      const ry = (-rimNDC.y * 0.5 + 0.5) * window.innerHeight;
+
+      const radiusPx = Math.hypot(rx - cx, ry - cy);
+      const sizePx = Math.max(0, Math.min(window.innerWidth, window.innerHeight, radiusPx*2));
+
+      // position & size portal exactly over drum
+      portal.style.left = `${Math.round(cx - sizePx/2)}px`;
+      portal.style.top  = `${Math.round(cy - sizePx/2)}px`;
+      portal.style.width  = portal.style.height = `${Math.round(sizePx)}px`;
+
+      // play glyph sized & centered with small inset
+      const gSize = Math.max(64, Math.min(120, sizePx * 0.22));
+      glyph.style.left = portal.style.left; glyph.style.top = portal.style.top; glyph.style.width = portal.style.width; glyph.style.height = portal.style.height;
+      glyph.querySelector('.hit').style.cssText = `width:${gSize}px;height:${gSize}px;left:${(sizePx-gSize)/2}px;top:${(sizePx-gSize)/2}px;border-radius:50%`;
+
+      // keep proc canvas in sync
+      if (proc.width !== Math.round(sizePx)) resizeProc(Math.round(sizePx));
+    }
+
+    // ——— INTERACTION ———
+    function setMode(m){
+      S.mode = m; document.querySelectorAll('.btn[data-mode]').forEach(b=>b.classList.toggle('active', b.dataset.mode===m));
+      if(m==='wash'){ S.spin=.32; S.wobble=.45; matGlass.color.setHex(0x7bdfff); statusEl.textContent='Status: Cleansing illusions'; cycleEl.textContent='Cycle: Wash'; }
+      if(m==='rinse'){ S.spin=.52; S.wobble=.28; matGlass.color.setHex(0x7b2cbf); statusEl.textContent='Status: Clarifying perception'; cycleEl.textContent='Cycle: Rinse'; }
+      if(m==='spin'){ S.spin=1.55; S.wobble=.8; matGlass.color.setHex(0xff2d6d); statusEl.textContent='Status: Accelerating truth'; cycleEl.textContent='Cycle: Spin'; }
+      if(m==='dry'){ S.spin=.12; S.wobble=.12; matGlass.color.setHex(0xffd24a); statusEl.textContent='Status: Crystallizing wisdom'; cycleEl.textContent='Cycle: Dry'; }
+    }
+
+    function togglePlay(){
+      S.playing = !S.playing;
+      const procEl = document.getElementById('proc');
+      const toggleBtn = document.getElementById('toggle');
+      if(S.playing){
+        toggleBtn.classList.add('active'); toggleBtn.textContent = 'Pause';
+        statusEl.textContent = 'Status: Projecting shadows';
+        glyph.classList.add('hidden'); procEl.classList.add('hidden'); videoWrap.classList.add('visible');
+        try{ tube.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
+             tube.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*'); }catch(e){}
+      } else {
+        toggleBtn.classList.remove('active'); toggleBtn.textContent = 'Play';
+        statusEl.textContent = 'Status: Meditation paused';
+        glyph.classList.remove('hidden'); videoWrap.classList.remove('visible'); procEl.classList.remove('hidden');
+        try{ tube.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*'); }catch(e){}
+      }
+    }
+
+    document.getElementById('enter').addEventListener('click', ()=>{
+      hero.classList.add('hidden'); panel.classList.add('visible');
+      statusEl.textContent='Status: Apparatus online';
+      setTimeout(()=>{ statusEl.textContent='Status: Ready for illumination'; }, 1200);
+      // auto swap from procedural → video after a short contemplation
+      setTimeout(()=>{ if(!S.playing) togglePlay(); }, 7000);
+    });
+
+    document.querySelectorAll('.btn[data-mode]').forEach(b=> b.addEventListener('click', ()=> setMode(b.dataset.mode)) );
+    document.getElementById('toggle').addEventListener('click', togglePlay);
+    glyphHit.addEventListener('click', togglePlay);
+
+    // pointer parallax
+    let mx=0,my=0; window.addEventListener('pointermove', e=>{ mx = (e.clientX/window.innerWidth - .5)*2; my = (e.clientY/window.innerHeight - .5)*2; });
+
+    // ——— ANIMATE ———
+    function animate(){ requestAnimationFrame(animate);
+      // machine motion
+      machine.rotation.z += S.spin * 0.01;
+      machine.rotation.x = Math.sin(performance.now()*0.0013)* S.wobble * 0.12;
+      machine.rotation.y = Math.cos(performance.now()*0.0018)* S.wobble * 0.12;
+
+      // flame flicker
+      const flick = 0.7 + Math.sin(performance.now()*0.008 + Math.sin(S.t))*0.3 + Math.random()*0.08;
+      flame.intensity = 1.1 + flick*0.9; cone.material.opacity = 0.05 + flick*0.05;
+      flame.color.setHSL(0.07 + Math.sin(S.t*0.15)*0.01, 1.0, 0.55 + Math.sin(S.t*0.5)*0.02);
+
+      // dust drift
+      motes.children.forEach(m=>{ m.position.x += m.userData.vx*S.spin; m.position.y += m.userData.vy*S.spin; m.position.z += m.userData.vz; if(Math.abs(m.position.x)>2.6) m.userData.vx*=-1; if(Math.abs(m.position.y)>2.6) m.userData.vy*=-1; if(m.position.z>0.6||m.position.z<-2.2) m.userData.vz*=-1; });
+
+      // puppets wander subtly
+      p1.position.x += Math.sin(S.t*0.003)*0.004; p2.position.x += Math.cos(S.t*0.0027)*0.004;
+
+      // camera parallax
+      camera.position.x += (mx*1.1 - camera.position.x)*0.05;
+      camera.position.y += (-my*.8 + 0.6 - camera.position.y)*0.05;
+      camera.lookAt(0,0,0);
+
+      // portal viz + alignment
+      updateOverlay();
+      if(!document.getElementById('proc').classList.contains('hidden')) drawPortal();
+
+      renderer.render(scene,camera); S.t += 1;
+    }
+    animate();
+
+    // ——— RESIZE ———
+    function onResize(){ camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); updateOverlay(); }
+    window.addEventListener('resize', onResize);
+
+    // default mode highlight
+    setMode('wash');
+
+    // self-tests
+    console.assert(scene.children.includes(machine), 'Test[3] Scene should contain the machine group');
+    console.assert(typeof updateOverlay === 'function', 'Test[4] updateOverlay exists');
+    if (statusEl) statusEl.textContent = 'Self-test passed • Apparatus ready';
+  }
+  </script>
+</body>
+</html>
