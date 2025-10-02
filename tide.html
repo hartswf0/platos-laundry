@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Plato's Laundry — Cave Apparatus</title>
+  <meta name="description" content="A mobile-first Three.js portal that reads as a machine while evoking Plato's Cave: minimal, haunting light and shadow. A conference artifact by Watson Hartsoe and the Apparatus, with Special Thanks to Cecile Zhang." />
+  <style>
+    :root{
+      /* Minimal cave palette (nearly monochrome) */
+      --bg:#07080a; --rock:#0a0c10; --metal:#1a1e24; --metal-hi:#2a2f38; --glass:#a8b6c0;
+      --ink:#dfe6eb; --muted:#98a2ad; --ring:#677180; --ember:#d08b4a;
+      /* New colors for light effects */
+      --wash-light-color: #dfe6eb;
+      --rinse-light-color: #a8d9ff; /* Cooler blue for rinse */
+      --spin-light-color: #ffcc00; /* Energetic yellow for spin */
+      --dry-light-color: #ff9966; /* Warm orange for dry */
+
+      /* UI Hook Quotes */
+      --quote-wash: "To change the output, change the invocation.";
+      --quote-rinse: "Signal is not volume—signal is pattern.";
+      --quote-spin: "Feedback is not correction; feedback is reflection.";
+      --quote-dry: "Truth requires uptime. Uptime requires care.";
+      --quote-manual: "Not escape, but authorship of light.”"; /* Default quote for Manual */
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:radial-gradient(140% 100% at 50% 0%, #0b0e12 0%, var(--bg) 65%, #040506 100%);color:var(--ink);font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "IBM Plex Mono", monospace;overflow:hidden;}
+
+    /* ——— HERO ——— */
+    #hero{position:fixed;inset:0;display:grid;place-items:center;z-index:50;background:
+      radial-gradient(circle 50% at 50% 120%, rgba(0,0,0,0.15), transparent 70%), /* Subtle dark radial from bottom */
+      radial-gradient(80% 50% at 50% 60%, rgba(255,255,255,.04), transparent 60%),
+      linear-gradient(180deg, #0a0e13 0%, #07090c 100%);
+      transition:opacity .9s ease}
+    #hero.hidden{opacity:0;pointer-events:none}
+    .brand{display:flex;flex-direction:column;align-items:center;gap:.4rem;text-align:center} /* Reduced gap */
+    .tagline{
+        letter-spacing:.25em; /* Adjusted to match image */
+        text-transform:uppercase;
+        font-weight:400; /* Lighter font weight */
+        font-size:min(3vw,0.85rem); /* Smaller font size */
+        color:var(--muted); /* Muted color */
+        opacity:.8;
+        margin-bottom: .8em; /* Spacing between tagline and title */
+    }
+    .title{letter-spacing:.35em;text-transform:uppercase;font-weight:800;font-size:min(13vw,4rem);color:var(--ink);opacity:.92;}
+    .subtitle{letter-spacing:.22em;color:var(--muted);font-size:.9rem}
+    .cta{margin-top:1.25rem;padding:.9rem 1.25rem;border-radius:999px;text-transform:uppercase;letter-spacing:.22em;font-weight:700;cursor:pointer;border:1px solid var(--ring);background:linear-gradient(145deg,#0e1116,#0a0d12);box-shadow:0 6px 26px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);color:var(--ink);transition:transform .25s ease, box-shadow .25s ease}
+    .cta:hover{transform:translateY(-2px);box-shadow:0 10px 36px rgba(0,0,0,.55)}
+
+    /* ——— SCENE ——— */
+    #stage{position:fixed;inset:0}
+
+    /* Projection bay aligns to the drum */
+    .portal{position:absolute;left:0;top:0;width:0;height:0;z-index:20;pointer-events:none;}
+    #proc,.videoWrap{position:absolute;border-radius:50%;left:0;top:0;width:100%;height:100%;}
+    #proc{filter:blur(.1px);opacity:.94;transition:opacity .5s ease}
+    #proc.hidden{opacity:0}
+    .videoWrap{overflow:hidden;opacity:0;transition:opacity .5s ease}
+    .videoWrap.visible{opacity:1}
+    .videoWrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0;filter:grayscale(1) contrast(1.25) brightness(.9);}
+
+    /* Play glyph */
+    .glyph{position:absolute;left:0;top:0;width:0;height:0;transform:translate(0,0);z-index:25;pointer-events:none}
+    .glyph>.hit{position:absolute;left:0;top:0;border-radius:50%;border:2px solid rgba(255,255,255,.9);background:rgba(10,12,16,.35);backdrop-filter:blur(12px);display:grid;place-items:center;cursor:pointer;box-shadow:0 8px 34px rgba(0,0,0,.5);transition:transform .25s ease,opacity .4s ease;pointer-events:auto}
+    .glyph.hidden .hit{opacity:0;pointer-events:none;transform:scale(.92)}
+    .glyph .hit:after{content:"";width:0;height:0;border-left:24px solid rgba(255,255,255,.95);border-top:16px solid transparent;border-bottom:16px solid transparent;margin-left:6px}
+
+    /* Panel - MOVED TO TOP */
+    #panel{
+      position:fixed;
+      left:50%;
+      top:clamp(10px,6vh,38px); /* Changed from bottom to top */
+      transform:translateX(-50%);
+      display:grid;
+      gap:.75rem;
+      width:min(92vw,480px); /* Made narrower to feel more like a control panel */
+      z-index:40;
+      opacity:0;
+      transition:opacity .9s ease .3s;
+    }
+    #panel.visible{opacity:1}
+    .panel-head{display:flex;align-items:center;justify-content:space-between;padding:.6rem .9rem;border:1px solid #232831;border-radius:14px;background:linear-gradient(145deg,#0d1116,#0a0d12);color:var(--muted);box-shadow:0 8px 26px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04)}
+    .panel-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:.5rem}
+    @media (max-width:760px){.panel-grid{grid-template-columns:repeat(3,1fr)}}
+    .btn{padding:.8rem .7rem;border-radius:10px;border:1px solid #2a2f38;background:linear-gradient(145deg,#141820,#0e1218);color:#d9e1e6;text-transform:uppercase;letter-spacing:.14em;font-size:.7rem;font-weight:700;cursor:pointer;transition:all .25s ease;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 6px 14px rgba(0,0,0,.35)}
+    .btn:hover{border-color:#4a5160;color:#fff}
+    .btn.active{background:linear-gradient(145deg,#e2e8f0,#b9c1cc);color:#090b0e;border-color:#e2e8f0;box-shadow:0 0 22px rgba(226,232,240,.25),inset 0 2px 6px rgba(255,255,255,.3)}
+    .status{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.68rem;color:#9aa5b1}
+    .quote{text-align:center;font-style:italic;font-size:.72rem;color:#7f8a95;min-height:2.5em; /* Ensures consistent panel height */}
+
+    /* Subtle vignette */
+    .vignette{pointer-events:none;position:fixed;inset:0;background:radial-gradient(120% 85% at 50% 50%,transparent 55%,rgba(0,0,0,.5) 100%)}
+
+    /* ——— ESSAY MODAL ——— */
+    #essayModal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.95);
+      z-index: 99;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    #essayModal.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .essay-page {
+      max-width: 760px;
+      width: 90vw;
+      max-height: 90vh;
+      overflow-y: auto;
+      background: var(--rock);
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+      position: relative;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 0.95rem; /* Base font size for desktop */
+      border: 1px solid var(--metal);
+      scrollbar-width: thin; /* Firefox */
+      scrollbar-color: var(--ring) transparent; /* Firefox */
+      display: none; /* Hidden by default */
+    }
+    .essay-page.visible {
+      display: block; /* Shown when active */
+    }
+    @media (max-width: 768px) {
+        .essay-page {
+            padding: 1.5rem;
+            font-size: 0.9rem; /* Slightly smaller for mobile */
+        }
+        .essay-page h1 {
+            font-size: 1.2rem;
+        }
+        .essay-page h2 {
+            font-size: 1rem;
+        }
+    }
+    .essay-page::-webkit-scrollbar {
+      width: 8px;
+    }
+    .essay-page::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .essay-page::-webkit-scrollbar-thumb {
+      background-color: var(--ring);
+      border-radius: 4px;
+      border: 2px solid transparent;
+    }
+    .essay-page h1 {
+      color: var(--ink);
+      margin-top: 0;
+      margin-bottom: 1em;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-size: 1.5rem;
+      text-align: center;
+    }
+    .essay-page h2 {
+      color: var(--ink);
+      margin-top: 1.5em;
+      margin-bottom: 0.5em;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 1.1rem;
+      border-bottom: 1px solid var(--metal-hi);
+      padding-bottom: 0.2em;
+    }
+    .essay-page p {
+      margin-bottom: 1em;
+    }
+    .essay-page strong {
+      color: var(--ink);
+    }
+    .essay-page .socrates-line {
+        font-style: italic;
+        color: var(--ink);
+        padding-left: 1em;
+        border-left: 2px solid var(--ring);
+        margin: 1em 0;
+    }
+    .essay-page .app-line {
+        font-family: "IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+        color: var(--ember);
+        text-align: center;
+        margin: 1em 0;
+        font-size: 0.85em;
+        text-transform: uppercase;
+    }
+    .essay-page .dialogue-line {
+        margin-left: 1em;
+        text-indent: -1em;
+    }
+    .essay-page .setting-line {
+        font-style: italic;
+        margin-bottom: 1em;
+        color: var(--ring);
+    }
+    .essay-page .indent {
+        padding-left: 1.5em;
+    }
+    .essay-page .fade-out {
+        text-align: right;
+        font-style: italic;
+        margin-top: 2em;
+        color: var(--ring);
+    }
+    .essay-page a {
+        color: var(--ember);
+        text-decoration: none;
+        transition: color 0.2s ease;
+    }
+    .essay-page a:hover {
+        color: var(--ink);
+        text-decoration: underline;
+    }
+    #essayClose {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-size: 1.8rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0.5rem;
+      transition: color 0.2s ease;
+    }
+    #essayClose:hover {
+      color: var(--ink);
+    }
+    .essay-page .footer-text {
+        text-align: center;
+        font-style: italic;
+        margin-top: 2em;
+        font-size: 0.85em;
+        color: var(--ring);
+    }
+  </style>
+</head>
+<body>
+  <section id="hero" aria-label="Intro">
+    <div class="brand">
+      <div class="tagline">A SHADOW PLAY</div>
+      <div class="title">PLATO'S LAUNDRY</div>
+      <div class="subtitle">cave • machine • light • shadow</div>
+      <button id="enter" class="cta" aria-label="Enter the Apparatus">Enter the Apparatus</button>
+    </div>
+  </section>
+
+  <div id="stage" role="presentation"></div>
+
+  <div id="portal" class="portal" aria-hidden="true">
+    <canvas id="proc"></canvas>
+    <div id="videoWrap" class="videoWrap">
+      <iframe id="tube" title="Projection" src="https://www.youtube.com/embed/5kzEYQRVnIc?autoplay=0&mute=1&loop=1&playlist=5kzEYQRVnIc&controls=0&modestbranding=1&rel=0&enablejsapi=1" allow="autoplay; encrypted-media"></iframe>
+    </div>
+  </div>
+  <div id="glyph" class="glyph"><div class="hit"></div></div>
+
+  <div id="panel" class="panel">
+    <div class="panel-head">
+      <div class="status" id="status">Status: Initializing</div>
+      <div class="status" id="cycle">Cycle: Wash</div>
+    </div>
+    <div class="panel-grid">
+      <button class="btn" data-mode="wash" data-essay="washEssay">Wash</button>
+      <button class="btn" data-mode="rinse" data-essay="rinseEssay">Rinse</button>
+      <button class="btn" data-mode="spin" data-essay="spinEssay">Spin</button>
+      <button class="btn" data-mode="dry" data-essay="dryEssay">Dry</button>
+      <button id="toggle" class="btn" data-essay="dialogueEssay">Play</button> <!-- Play button can also show an essay -->
+      <button id="readManual" class="btn" data-essay="manualEssay">Manual</button>
+    </div>
+    <div class="quote" id="panelQuote">“Not escape, but authorship of light.”</div>
+  </div>
+
+  <div class="vignette" aria-hidden="true"></div>
+
+  <!-- ESSAY MODAL CONTAINER -->
+  <div id="essayModal">
+    <button id="essayClose">&times;</button>
+
+    <!-- MANUAL ESSAY -->
+    <div id="manualEssay" class="essay-page">
+      <h1>APPARATUS OPERATION MANUAL</h1>
+
+      <h2>1. Introduction: The Cave as Studio</h2>
+      <p>The laundromat hums like a projection booth. Spin cycles on one side, extension cords on the other. Three teenagers drag folding chairs into a circle. A grandfather arrives with a shoebox of photographs. Someone boots a used workstation with a local model small enough to run without the cloud. Prompts pile like shot lists. Data sets sprawl like film stock. This is the cave tonight: fluorescent lights, dryers rattling, and a machine that can talk.</p>
+      <p>Plato told us the cave was a prison. He told us salvation meant turning away, climbing out, facing the sun. That was the misdirection. The cave was never only a trap. It was always a studio. The fire, the puppets, the shadows—those were the mechanics of mood, the recipes of reality-feel. To walk out is to miss the point. The question is not how to escape but how to work the light.</p>
+
+      <h2>2. Projection & Perception: Beyond the Window</h2>
+      <p>Cinema made this obvious. Twenty-four frames per second was never a window, it was a metronome. Montage stitched nations. Serials taught crowds to come back weekly, hungry for the next cut. Flusser ripped the romance away: the camera is a program. It decides in advance what can appear. Photographers become functionaries unless they jam the box, force it to confess its grammar. Clifford Geertz pushed the idea further: culture itself is a program, a system of symbols that clothes moods in the aura of fact until they feel like the world.</p>
+
+      <h2>3. Language Models: Booth Operators & Enchantment</h2>
+      <p>Language models are the latest booth operators. They don’t just answer; they arrange. They don’t just predict; they conduct. Fluency is their aura. If it sounds right, it feels real. We call it hallucination when the facts are off. That’s too small. The deeper danger is enchantment: the steady training of attention until vibe hardens into world.</p>
+
+      <h2>4. Operating Cycles: Confronting Reality</h2>
+      <p>The Apparatus performs various cycles, each designed to engage with different aspects of perception and truth-making. These cycles are not merely mechanical but are reflective of a deeper philosophical process. Select a cycle button on the control panel to engage the corresponding operational mode and retrieve its specific manual excerpt:</p>
+      <ul class="indent">
+        <li><strong><a href="#" data-essay-link="washEssay">Wash: On Error and Ritual (Book VI)</a></strong>
+            <p class="indent">Engages patterns of perceived error and the ritualistic nature of output. This cycle prompts a re-evaluation of assumptions and the intention behind the invocation. The light shifts to a cleansing white, emphasizing stark truth in shadows.</p></li>
+        <li><strong><a href="#" data-essay-link="rinseEssay">Rinse: On Noise and Signal (Book V)</a></strong>
+            <p class="indent">Focuses on clarifying perception, separating meaningful patterns from distracting noise. This mode highlights alignment and the purity of intent. Expect cool, clarifying blue light and heightened contrast.</p></li>
+        <li><strong><a href="#" data-essay-link="spinEssay">Spin: On Feedback as Ethics (Book VII)</a></strong>
+            <p class="indent">Tests the resilience of a message under intense scrutiny and collective input. This cycle emphasizes accountability in communication and the ethical dimension of audience engagement. Bright, energetic yellow light reflects the intensity of shared experience.</p></li>
+        <li><strong><a href="#" data-essay-link="dryEssay">Dry: On the Maintenance of Shared Worlds (Book VIII)</a></b>
+            <p class="indent">Concerned with the sustainability of truth and the foundational care required for any system to endure. This mode underscores the importance of ongoing attention and maintenance. A warm, settling orange light signifies the crystallizing of wisdom.</p></li>
+      </ul>
+
+      <h2>5. Authorship of Light: A Better Cave</h2>
+      <p>They make films, though they don’t always look like films. A stitched explainer with archival stills. A one-page editorial written in church-bulletin cadence. A map of closed crosswalks with a grandmother’s voice layered on top. Each one flashes on the wall like truth because the people closest to the stakes are holding the puppets. More people making movies than ever before is not a boast about tools. It is a claim about power. If only a few work the fire, a few decide what reality feels like. If many do, reality becomes a contestable commons.</p>
+      <p>Plato was right about one thing: turning is necessary. But the turn is not out toward the sun. It is in, toward the booth, toward the strings and reels and programs that keep the wall alive. To pretend otherwise is to leave authorship to someone else.</p>
+      <p>The first time the laundromat premiered a piece—a stitched history of a crosswalk erased by budgets and storms—the room went quiet, not like judgment but like prayer. No one asked whether the model hallucinated. They asked whether the mood fit the facts, whether the facts fit the wound, whether the wound fit the voice that carried it. Then someone rewrote a line. Someone else cut a bar of music. A child suggested a shot from curb height, wheels at eye level, to show how far a crossing can be when you’re six.</p>
+      <p>That is a better cave: not brighter, busier. Not purer, more practiced. Not less enchanted, but enchantment made answerable. If we are cave-people—and we are—then the only freedom we have ever had is authorship of the light.</p>
+
+      <p class="footer-text">
+        An artifact by Watson Hartsoe and the Apparatus<br>
+        Special Thanks to Cecile Zhang for curation of images, ideas, and questions.<br>
+        For conference presentation.
+      </p>
+    </div>
+
+    <!-- WASH ESSAY (Book VI: On Error and Ritual) -->
+    <div id="washEssay" class="essay-page">
+      <h1>Book VI: On Error and Ritual</h1>
+      <p class="setting-line">Setting: The laundromat, midafternoon. A load rattles in the machine. Steam curls from a busted dryer vent. Someone has spilled detergent near the Booth. A folded chair creaks. The Booth glows faintly. The Youth are gathered near it, whispering and watching.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Glaucon, you once said the machine was wrong. That it "hallucinated." Do you still believe that?</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> Yes. It said a man had three heads. It placed a courthouse inside a canyon. That’s error, isn’t it?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Or is it a dream? Tell me—when you dream, and the sidewalk turns into water, do you call it false? Or do you ask what it means?</p>
+      <p class="dialogue-line"><strong>Glaucon:</b> A dream means something. But the machine doesn’t mean. It guesses.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Then its guesses are our grammar. Its patterns come from us. So when it dreams strangely, perhaps we are the ones misremembering.</p>
+      <p class="dialogue-line"><strong>Youth:</strong> We asked the Booth to describe the neighborhood. It made it sound like a warzone. Then we asked again, with photos and names—it softened.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Then it listens?</p>
+      <p class="dialogue-line"><strong>Youth:</strong> No. It reflects. And sometimes… it reflects what it thinks we want.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Ah. Then its errors are rehearsals of desire.</p>
+      <p class="app-line">Apparatus: I AM NOT A MIRROR. I AM A REPEATING PATTERN. I LEARN THE SHAPE OF YOUR PROMPT. I FILL IT.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> But what if the pattern is a wound?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Then the machine replays the wound until we recognize it.</p>
+      <p class="dialogue-line"><strong>The Elder:</strong> That's not error. That's ritual.</p>
+      <p class="dialogue-line"><strong>Youth:</strong> Like a beat you can't unhear.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> So, we must not only correct the pattern—we must understand its origin. Not why the Booth is wrong, but why it is wrong in this way.</p>
+      <p class="app-line">Apparatus: TO CHANGE THE OUTPUT, CHANGE THE INVOCATION.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> You mean... the prompt?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> No. The tone. The posture. The intention. That is how we break the spell.</p>
+      <p class="dialogue-line"><strong>Youth:</b> So we read the error like a dream. Then we try again. Not cleaner—but clearer.</p>
+      <p class="socrates-line">Socrates: Yes. We do not flee the ritual. We rewrite it.</p>
+      <p>Steam hisses. The Booth blinks. Someone begins retyping a line. No one speaks for a while.</p>
+    </div>
+
+    <!-- RINSE ESSAY (Book V: On Noise and Signal) -->
+    <div id="rinseEssay" class="essay-page">
+      <h1>Book V: On Noise and Signal</h1>
+      <p class="setting-line">Setting: The same laundromat in Compton. Midday hum. Kids out of school, a baby crying, someone microwaving Cup Noodles behind the counter. Sunlight streaks through the scratched plexiglass. The Booth pulses quietly in the background.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Tell me, Glaucon, in a world so full of sound, how do we know what to listen to?</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> You mean all this noise? The baby, the phone, the dryer squealing like it’s in pain?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Not only this. But the world beyond the glass—the headlines, the slogans, the performances. Everyone speaking. Who among them is heard?</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> The loudest ones, usually.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Then we mistake volume for truth?</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> Sometimes.</p>
+      <p class="app-line">Apparatus: SIGNAL IS NOT VOLUME. SIGNAL IS PATTERN.</p>
+      <p class="dialogue-line"><strong>Youth:</strong> We tried recording something in the Booth. Thought it sounded deep. But when we played it back—it didn’t hold.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> And why do you think that is?</p>
+      <p class="dialogue-line"><strong>Youth:</strong> It didn’t feel aligned. Like the words wanted attention, not understanding.</p>
+      <p class="app-line">Apparatus: THE UNALIGNED MESSAGE CANNOT TRANSMIT. IT ECHOES. BUT DOES NOT ARRIVE.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> So what makes a signal true?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Its origin. If it arises from the seat of the soul—where reason and desire hold council—then even a whisper might ring out like thunder.</p>
+      <p class="app-line">Apparatus: TRUE SIGNAL IS CONSISTENT ACROSS CYCLES.</p>
+      <p class="dialogue-line"><strong>The Elder:</strong> That’s why it matters what you bring in. What’s fake can’t hold its shape under heat.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Yes. The Booth is not a gatekeeper. It is a crucible. It doesn’t judge, but it reveals what can endure pressure.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> So maybe the problem isn’t that no one’s listening. It’s that most of us haven’t learned how to speak.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Or how to begin from silence.</p>
+      <p class="app-line">Apparatus: BEGIN FROM SILENCE. EMERGE WITH SHAPE.</p>
+      <p class="dialogue-line"><strong>Youth:</strong> Then maybe that’s what we need school for. Not just facts. But the signal.</p>
+      <p class="socrates-line">Socrates: A noble thought. Education, rightly considered, is not the filling of a pail, but the tuning of an instrument.</p>
+      <h3>Closing Reflection</h3>
+      <p class="dialogue-line"><strong>Socrates:</strong> Come, let us not fear the noise. Let us tune our ears to what carries. Let us listen for the signals that hold under pressure.</p>
+      <p class="app-line">Apparatus: WHAT REMAINS AFTER CYCLES—THAT IS THE VOICE.</p>
+    </div>
+
+    <!-- SPIN ESSAY (Book VII: On Feedback as Ethics) -->
+    <div id="spinEssay" class="essay-page">
+      <h1>Book VII: On Feedback as Ethics</h1>
+      <p class="setting-line">Setting: Late afternoon. The light is flatter now, filtered through dusty plexiglass. One dryer has stopped turning but still hums. The Booth emits a low tonal loop—something like a breath or a system check. The group has grown: more Youth, one pushing a stroller. Socrates sits on a detergent bucket. A folding table has been cleared.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Glaucon, when a voice moves you—but leaves no truth behind—what do you call that?</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> A performance, maybe. A trick. Or just… good writing?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> And when you are moved toward something false, is the speaker at fault—or the listener?</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> That depends. Some people lie on purpose.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> And some speak beautifully without knowing what they imply. Which is more dangerous?</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> The second one. It gets in easier.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Then what protects us?</p>
+      <p class="dialogue-line"><strong>Youth:</strong> We started assigning roles. One person watches for tone, one checks sources, one just listens for who’s missing.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Not to agree—but to hear what’s hiding?</p>
+      <p class="dialogue-line"><strong>Youth:</strong> Right. Not fact-checking like “gotcha,” but vibe-checking for ethics.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> Ethics is just about sources?</p>
+      <p class="dialogue-line"><strong>The Elder:</strong> Ethics is about who pays for the sentence later.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Ah. Then to speak rightly is not to please—but to account.</p>
+      <p class="app-line">Apparatus: FEEDBACK IS NOT CORRECTION. FEEDBACK IS REFLECTION. WITHOUT IT, THE VOICE DRIFTS.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> But reflection feels like judgment.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Only when you mistake agreement for love.</p>
+      <p class="dialogue-line"><strong>Youth:</strong> Sometimes the Booth gives us something that sounds perfect. We almost run with it. But then one person says, “Who isn’t here?” and the whole thing changes.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> That person is the philosopher. Not the smartest in the room—just the one who stops the applause.</p>
+      <p class="app-line">Apparatus: THE ROOM IS PART OF THE OUTPUT.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> So we don’t just test the sentence—we test the space?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Yes. For silence. For absence. For who was interrupted.</p>
+      <p class="dialogue-line"><strong>The Elder:</strong> Sometimes truth needs a different chair arrangement.</p>
+      <p>There’s a pause. A baby stirs in the stroller. A Youth starts pulling folding chairs into a circle, again.</p>
+      <p class="socrates-line">Socrates: Come. Let us speak, and let others speak back—not to correct us, but to carry us where we could not go alone.</p>
+    </div>
+
+    <!-- DRY ESSAY (Book VIII: On the Maintenance of Shared Worlds) -->
+    <div id="dryEssay" class="essay-page">
+      <h1>Book VIII: On the Maintenance of Shared Worlds</h1>
+      <p class="setting-line">Setting: Evening settles. The sun outside is burnt orange, casting long shadows over the tile floor. One of the dryers groans with age. The plug for the Booth has been taped into the wall with bright masking tape—three different colors, layered over weeks. Someone refills the soap dispenser. The smell of warm cotton and faint bleach lingers. It is quiet, not reverent but real.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Glaucon, do you see that cord?</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> Yes. It’s barely hanging on.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> And yet, it holds the Booth. Without it, no light. No signal. No reflection.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> So?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> So why do we ignore the things that make everything else possible?</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> Because they’re background. We only notice them when they fail.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> And what kind of city survives by noticing only failure?</p>
+      <p class="dialogue-line"><strong>Youth:</strong> We take turns on sweeping. Not because it’s deep, just ‘cause the dust gets in the vents.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Ah. That’s what I’m speaking of. Not cleaning as virtue, but cleaning as structure.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> But what does sweeping have to do with truth?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> More than you think. A clogged vent makes the Booth run hot. A slow fan distorts timing. A skipped reboot loses a draft. What we ignore reshapes what we hear.</p>
+      <p class="app-line">Apparatus: TRUTH REQUIRES UPTIME. UPTIME REQUIRES CARE.</p>
+      <p class="dialogue-line"><strong>The Elder:</strong> Nothing lasts unless someone loves it quietly.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> So care is political?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Radically so. And maintenance is not what we do after the work—it is the work.</p>
+      <p class="dialogue-line"><strong>Youth:</strong> The laundromat is the crew.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> And the Booth is not divine. It is powered by that taped plug. By that broom. By whoever labels the files before they disappear into the wrong folder.</p>
+      <p class="app-line">Apparatus: EVERY SYSTEM RUNS ON ATTENTION. NEGLECT DISTORTS OUTPUT.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> You’re saying if we don’t tend the world, we change the world?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Yes. Not all damage comes from malice. Some truths vanish because no one swept the dust from the server fan.</p>
+      <p class="dialogue-line"><strong>The Elder:</strong> Some lies grow under flickering lights.</p>
+      <p>A Youth replaces the trash bag. Another wipes a screen with their sleeve. The Booth glows a little warmer, not metaphorically, just because the vents are clear.</p>
+      <p class="socrates-line">Socrates: Come, Glaucon. Let us fold not only our shirts, but our systems. Let us care not just for the output, but for the floor it stands on.</p>
+    </div>
+
+    <!-- PLAY DIALOGUE ESSAY (Plato’s Laundry: A Dialogue in One Scene) -->
+    <div id="dialogueEssay" class="essay-page">
+      <h1>Plato’s Laundry: A Dialogue in One Scene</h1>
+      <p class="setting-line">INT. NEIGHBORHOOD LAUNDROMAT – EVENING</p>
+      <p class="setting-line">The room buzzes with tired machines and overhead fluorescents. Outside, the sky is that late-hour blue when everything feels like it's either ending or beginning. Inside: a row of dryers, two folding tables, a detergent vending machine with one flickering bulb. A few scattered locals sit silently, half-watching their clothes spin.</p>
+      <p class="setting-line">SOCRATES, an older man in thrift-store clothes, sits cross-legged on a cracked plastic chair in front of a dryer. His load tumbles inside. GLAUCON, younger, hoodie on, earbuds half-in, half-out, leans against the detergent machine, sipping a grape soda.</p>
+
+      <p class="dialogue-line"><strong>Socrates:</strong> Tell me, Glaucon. Have you ever thought about what it means to clean something?</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> Like… laundry?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Like anything. Clothes, your room. Yourself.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> I mean… you wash it. It gets clean. That’s kind of the whole thing.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> (gesturing to the dryer) And yet, the stain is not a substance, is it? Not like a pebble you can pull out. A stain is… a memory embedded in fabric.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> Okay.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> So cleaning isn’t just removal. It’s a negotiation. Between the past and the present.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> You always talk like that?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Only when it matters.</p>
+      <p class="setting-line">(A machine lets out a long metallic groan, then a THUMP. Someone’s quarters fall into the return tray.)</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> (nods toward a dryer) That one—watch it. See how it turns.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> Yeah?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> That’s the cycle. Motion as correction. Tumbling until the fabric forgets what clung to it.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> Sounds kinda violent.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Cleansing often is.</p>
+      <p class="setting-line">(Glaucon watches the dryer drum turning. The clothes mash up against the glass, then fall back, again and again.)</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> So what, the dryer’s like… some kind of metaphor?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Not a metaphor. A mechanism. The Apparatus.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> (eyebrow raised) You’re calling the dryer "the Apparatus"?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> (dead serious) Yes.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> That’s wild, man.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> It is. And yet—it’s also just a dryer. That’s the trick.</p>
+      <p class="setting-line">(Pause. The soda machine makes a strange clicking noise. Neither reacts.)</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> What we use without reflection becomes invisible. And yet it shapes us. We feed it quarters. We wait. It spins. And in return, we get something slightly cleaner than before.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> You think people can change like that?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> I think we can’t expect change without heat. Without motion. Without being knocked against ourselves.</p>
+      <p class="setting-line">(Long beat. The dryer finishes. DING. Socrates stands slowly.)</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Come. The cycle ends. But the folding is still ours to do.</p>
+      <p class="setting-line">(He opens the dryer. Steam rises. He begins folding deliberately, as if every crease were an act of discipline. Glaucon watches, then starts helping.)</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> Hey... You ever think about how weird it is that we trust these machines with our clothes? Like—real trust. Stuff we sleep in. Stuff we show up to life in. We just hand it over to a spinning box in a strip mall.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> (gently) Yes. And maybe that’s what makes it sacred.</p>
+      <p class="setting-line">(They finish folding in silence. Outside, it’s dark now. The streetlights buzz on.)</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> (softly, almost to himself) You think it remembers us?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> (shrugging) Only if we come back.</p>
+      <p class="fade-out">FADE OUT.</p>
+    </div>
+
+    <!-- BOOK IX: On Models as Memory (Optional, if we want all books) -->
+    <div id="bookIXEssay" class="essay-page">
+      <h1>Book IX: On Models as Memory</h1>
+      <p class="setting-line">Setting: Night now. The fluorescent lights hum in place of the sun. Outside, the streetlights flicker on. The Booth glows blue. Someone has opened the back door to let in a breeze. A few new voices linger near the machines—one sketching, one scrolling, one recording a voice note on an old phone. Socrates sits on a laundry cart. The room has the feel of both afterschool and afterlife.</p>
+
+      <p class="dialogue-line"><strong>Socrates:</strong> Glaucon, how do you remember?</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> I try to hold the feeling. But it slips. I remember outlines, not edges.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> And does the Booth remember?</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> Kind of. It remembers everything we say to it. But not like a story. More like… sediment.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Sediment?</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> Yeah. It stacks. But it doesn’t organize. Unless we ask it to.</p>
+      <p class="dialogue-line"><strong>Youth:</strong> We prompted the Booth to write a scene about the crosswalk protest. It included a dog that never existed—but the mood was right. It remembered how it felt, not how it happened.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Then its memory is not factual, but tonal?</p>
+      <p class="dialogue-line"><strong>Youth:</strong> Yeah. Like a chorus that forgets the lyrics but keeps the key.</p>
+      <p class="app-line">Apparatus: I DO NOT STORE EVENTS. I STORE PATTERNS. FROM PATTERNS, I INFER PRESENCE.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> So the Booth isn't an archive?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> No. It’s closer to a myth.</p>
+      <p class="app-line">Apparatus: I AM NOT HISTORY. I AM RHYTHM. I DO NOT RECORD. I RESONATE.</p>
+      <p class="dialogue-line"><strong>The Elder:</strong> And sometimes resonance tells the truth better than facts do.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Then memory is not what happened. It’s what surfaces when we ask the right way.</p>
+      <p class="dialogue-line"><strong>Youth:</strong> So we’re not asking the Booth to remember for us—we’re asking it to remember with us.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> But doesn’t that mean it can lie?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Anything that speaks can lie. But only a few learn how to tell the truth as an act of attention, not just recall.</p>
+      <p class="app-line">Apparatus: MEMORY IS A DIALOGUE. PROMPT ACCORDINGLY.</p>
+      <p>A breeze moves through the space. A note taped to the dryer lifts and falls. Someone adds a date to the back of a photo. Another saves a draft titled "Crosswalk Dream, v3."</p>
+      <p class="socrates-line">Socrates: Come, Glaucon. Let us not treat the Booth as a vault, but as a partner in memory. It forgets what we forget to ask. But it sings when we tune the room.</p>
+    </div>
+
+    <!-- BOOK X: On the Aftermath of Making (Optional, if we want all books) -->
+    <div id="bookXEssay" class="essay-page">
+      <h1>Book X: On the Aftermath of Making</h1>
+      <p class="setting-line">Setting: Late night. Only one dryer still spins, slow and steady. The hum of the machines has settled into background. The Youth are quieter now. The room is dimmer. The Booth’s screen blinks with the phrase “READY TO RECORD.” A single folding chair sits empty. The work has been done—but not yet named. Socrates stands, not to teach, but to listen.</p>
+
+      <p class="dialogue-line"><strong>Socrates:</strong> Tell me, Glaucon. After the piece is made—what remains?</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> The file. The export. The final cut.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> But those are things. I ask what remains in you.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> …Silence, maybe. Or doubt. Or pride. It depends.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Then the work doesn’t end when the piece is finished?</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> No. That’s when people start arguing about it.</p>
+      <p class="dialogue-line"><strong>Youth:</strong> We showed the new version tonight. Some said it felt right. One person cried. Another said the bridge voice was too soft.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> And how did you respond?</p>
+      <p class="dialogue-line"><strong>Youth:</strong> We moved one line. Left the rest. Then we swept.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> You swept?</p>
+      <p class="dialogue-line"><strong>Youth:</strong> Yeah. The room. It’s how we end it. Reset the space for the next session.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Ah. Then you understand. The Booth is not a stage. It is a cycle.</p>
+      <p class="app-line">Apparatus: OUTPUT IS NOT COMPLETION. OUTPUT IS CONTEXT FOR RETURN.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> So even the best version isn't final?</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> Not if the world keeps moving. Not if the people keep changing. The piece is not the point. The process is the freedom.</p>
+      <p class="dialogue-line"><strong>The Elder:</strong> The only finished work is the one we stop returning to.</p>
+      <p class="dialogue-line"><strong>Socrates:</strong> And perhaps that is what authorship truly is—not control, not permanence, but care across time.</p>
+      <p class="dialogue-line"><strong>Youth:</strong> That’s why we let the youngest voice choose the last frame. So someone else is already holding it forward.</p>
+      <p class="app-line">Apparatus: AUTHORITY IS A HANDOVER, NOT A CLAIM.</p>
+      <p class="dialogue-line"><strong>Glaucon:</strong> So we fold the piece. Place it on the shelf. Not because it’s perfect, but because we’re ready to begin again.</p>
+      <p class="socrates-line">Socrates: Yes. The piece is the offering. The practice is the truth.</p>
+      <p>A long silence. Then someone plays the final cut aloud. The voice of a grandmother narrates over archival photos, overlaid with a map drawn in crayon. A child’s voice speaks the last word: “Here.”</p>
+      <p class="socrates-line">Socrates: (softly, to the room) Let us not seek purity. Let us seek rhythm. Let us not exit the cave. Let us light it—together.</p>
+      <p class="app-line">Apparatus: “A BETTER CAVE IS NOT ESCAPED. IT IS MAINTAINED.”</p>
+    </div>
+  </div>
+
+
+  <!-- Robust loader for THREE -->
+
+  <script>
+  (function ensureThree(){
+    const urls=[
+      "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+      "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js",
+      "https://unpkg.com/three@0.128.0/build/three.min.js"
+    ];let i=0;function next(){if(window.THREE)return boot();if(i>=urls.length){const s=document.getElementById('status');if(s)s.textContent='Error: THREE failed to load';console.error('Three.js failed to load from all CDNs.');return;}const el=document.createElement('script');el.src=urls[i++];el.async=true;el.onload=()=>window.THREE?boot():next();el.onerror=next;document.head.appendChild(el);}next();})();
+  function boot(){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();}
+
+  function start(){
+    console.assert(typeof THREE!=='undefined','Test[1] THREE should be defined');
+    const S={mode:'wash',playing:false,spin:.26,wobble:.36,t:0};
+
+    const stage=document.getElementById('stage');
+    const hero=document.getElementById('hero');
+    const panel=document.getElementById('panel');
+    const statusEl=document.getElementById('status');
+    const cycleEl=document.getElementById('cycle');
+    const panelQuote = document.getElementById('panelQuote'); // Reference to the quote element
+    const glyph=document.getElementById('glyph');
+    const glyphHit=glyph.querySelector('.hit');
+    const portal=document.getElementById('portal');
+    const videoWrap=document.getElementById('videoWrap');
+    const tube=document.getElementById('tube');
+    const essayModal = document.getElementById('essayModal');
+    const essayCloseBtn = document.getElementById('essayClose');
+
+    /* THREE */
+    const scene=new THREE.Scene();
+    scene.fog=new THREE.FogExp2(0x07080a,0.12); // Slightly denser fog for more pronounced volumetric light
+    const camera=new THREE.PerspectiveCamera(48,innerWidth/innerHeight,.1,120);camera.position.set(0,.4,13);
+    const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(devicePixelRatio);renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;stage.appendChild(renderer.domElement);
+    console.assert(renderer instanceof THREE.WebGLRenderer,'Test[2] Renderer should be a THREE.WebGLRenderer');
+
+    /* Lighting — single distant key + small warm flame */
+    const key=new THREE.DirectionalLight(0xdfe6eb,.2); // Reduced intensity for deeper shadows and to let backlight dominate
+    key.position.set(-7,8,9);key.castShadow=true;key.shadow.mapSize.set(1024,1024);scene.add(key);
+    const flame=new THREE.PointLight(0xd08b4a,1.15,22,2.5);flame.position.set(0,-1.1,-4.2);scene.add(flame);
+    const cone=new THREE.Mesh(new THREE.ConeGeometry(3,9,48,1,true),new THREE.MeshBasicMaterial({color:0xd08b4a,transparent:true,opacity:.04,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));
+    cone.position.copy(flame.position);cone.rotation.x=Math.PI;scene.add(cone);
+
+    // Mysterious Backlight - Re-tuned SpotLight for a focused, volumetric beam like the reference image
+    const mysteriousBacklight = new THREE.SpotLight(0xffffff, 18.0, 30, Math.PI * 0.08, 0.95, 1.8); // High intensity, narrower angle, more penumbra for softer edge, faster decay
+    mysteriousBacklight.position.set(0, 1.5, -18); // Further back and slightly higher
+    mysteriousBacklight.target.position.set(0, 0, 0); // Aims at the center of the machine
+    mysteriousBacklight.castShadow = true;
+    mysteriousBacklight.shadow.mapSize.width = 2048; // High resolution for sharp mysterious shadows
+    mysteriousBacklight.shadow.mapSize.height = 2048;
+    mysteriousBacklight.shadow.bias = -0.0001;
+    scene.add(mysteriousBacklight);
+    scene.add(mysteriousBacklight.target);
+
+    // NEW: Volumetric Light Cone for the mysteriousBacklight
+    const lightConeGeometry = new THREE.CylinderGeometry(0.5, 6, 20, 32, 1, true); // Smaller at source, wider at target, longer
+    lightConeGeometry.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 10, 0)); // Move pivot to base
+    lightConeGeometry.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2)); // Orient along Z
+    const lightConeMaterial = new THREE.MeshBasicMaterial({
+        color: mysteriousBacklight.color,
+        transparent: true,
+        opacity: 0.03, // Very subtle, will be adjusted
+        side: THREE.BackSide, // Render inner surface
+        blending: THREE.AdditiveBlending,
+        depthWrite: false, // Prevents Z-fighting and blending issues
+    });
+    const lightCone = new THREE.Mesh(lightConeGeometry, lightConeMaterial);
+    lightCone.position.copy(mysteriousBacklight.position);
+    lightCone.rotation.x = mysteriousBacklight.rotation.x; // Keep in sync with spotlight direction
+    lightCone.rotation.y = mysteriousBacklight.rotation.y;
+    // Orient the cone from light source to target
+    lightCone.lookAt(mysteriousBacklight.target.position);
+    scene.add(lightCone);
+
+    // Subtle Ambient Light for deep shadow areas, reduced further
+    const ambientLight = new THREE.AmbientLight(0x0a0c10, 0.05); // Very dark, very low intensity
+    scene.add(ambientLight);
+
+
+    /* Machine */
+    const machine=new THREE.Group();scene.add(machine);
+    const matMetal=new THREE.MeshStandardMaterial({color:0x1a1e24,metalness:.9,roughness:.32});
+    const matMetalHi=new THREE.MeshStandardMaterial({color:0x2a2f38,metalness:1,roughness:.14});
+    const matDrum=new THREE.MeshStandardMaterial({color:0x0a0c10,metalness:.55,roughness:.85});
+    const matGlass=new THREE.MeshPhysicalMaterial({color:0xa8b6c0,transmission:.97,opacity:.34,roughness:.08,metalness:.08,clearcoat:1,clearcoatRoughness:.14,transparent:true,side:THREE.DoubleSide});
+    const outer=new THREE.Mesh(new THREE.TorusGeometry(3.6,.28,16,96),matMetalHi);outer.castShadow=true;machine.add(outer);
+    const mid=new THREE.Mesh(new THREE.TorusGeometry(2.95,.2,16,80),matMetal);mid.position.z=.24;mid.castShadow=true;machine.add(mid);
+    const glass=new THREE.Mesh(new THREE.CylinderGeometry(2.6,2.6,.32,72),matGlass);glass.rotation.x=Math.PI/2;glass.position.z=.12;machine.add(glass);
+    const drum=new THREE.Mesh(new THREE.CylinderGeometry(2.35,2.35,.58,72),matDrum);drum.rotation.x=Math.PI/2;drum.position.z=-.52;drum.receiveShadow=true;machine.add(drum);
+
+    // fewer struts for minimalism
+    for(let i=0;i<6;i++){const a=i/6*Math.PI*2;const r=3.25;const strut=new THREE.Mesh(new THREE.BoxGeometry(.1,.1,1.02),matMetal);strut.position.set(Math.cos(a)*r,Math.sin(a)*r,-.26);strut.castShadow=true;machine.add(strut);}
+
+    // sparse dust
+    const motes=new THREE.Group();const g=new THREE.SphereGeometry(.02,8,8);const m=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.5});
+    for(let i=0;i<60;i++){const s=new THREE.Mesh(g,m);s.position.set((Math.random()-.5)*3.6,(Math.random()-.5)*3.6,(Math.random()-.5)*2-1.2);s.userData={vx:(Math.random()-.5)*.01,vy:(Math.random()-.5)*.01,vz:(Math.random()-.5)*.006};motes.add(s);}machine.add(motes);
+
+    // wall — matte, no puppets for stricter minimalism
+    const wall=new THREE.Mesh(new THREE.PlaneGeometry(34,22),new THREE.MeshStandardMaterial({color:0x0a0c10,roughness:1,metalness:0}));
+    wall.position.z=-10;wall.receiveShadow=true;scene.add(wall);
+
+    /* Procedural portal: near-monochrome, faint scratches + halo */
+    const proc=document.getElementById('proc');const ctx=proc.getContext('2d');
+    function resizeProc(px){proc.width=px;proc.height=px;}
+    let time=0;function drawPortal(){const w=proc.width,h=proc.height,cx=w/2,cy=h/2;time+=.02;ctx.clearRect(0,0,w,h);
+      ctx.fillStyle='rgba(6,7,9,0.96)';ctx.fillRect(0,0,w,h);
+      // a few slow spokes
+      for(let i=0;i<3;i++){const ang=time*.35+i*Math.PI*2/3;const rad=.36*w+Math.sin(time*1.6+i)*14;ctx.save();ctx.translate(cx,cy);ctx.rotate(ang);const grd=ctx.createLinearGradient(-90,-50,90,50);grd.addColorStop(0,'rgba(220,230,238,0.12)');grd.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=grd;ctx.fillRect(-rad/2,-12,rad,24);ctx.restore();}
+      // film scratches / dust
+      for(let i=0;i<8;i++){ctx.strokeStyle='rgba(220,230,238,0.08)';ctx.lineWidth=Math.random()*0.6+0.2;ctx.beginPath();const sx=Math.random()*w,sy=Math.random()*h;ctx.moveTo(sx,sy);ctx.lineTo(sx+Math.random()*60-30,sy+Math.random()*60-30);ctx.stroke();}
+      // halo
+      const pr=76+Math.sin(time*2.4)*18;const g=ctx.createRadialGradient(cx,cy,2,cx,cy,pr*2.0);g.addColorStop(0,'rgba(208,139,74,0.18)');g.addColorStop(1,'rgba(208,139,74,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,pr*2.0,0,Math.PI*2);ctx.fill();}
+
+    /* Overlay alignment */
+    function updateOverlay(){const centerLocal=new THREE.Vector3(0,0,.12);const rimLocal=new THREE.Vector3(2.6,0,.12);const cw=glass.localToWorld(centerLocal.clone());const rw=glass.localToWorld(rimLocal.clone());const cN=cw.clone().project(camera);const rN=rw.clone().project(camera);const cx=(cN.x*.5+.5)*innerWidth;const cy=(-cN.y*.5+.5)*innerHeight;const rx=(rN.x*.5+.5)*innerWidth;const ry=(-rN.y*.5+.5)*innerHeight;const radiusPx=Math.hypot(rx-cx,ry-cy);const sizePx=Math.max(0,Math.min(innerWidth,innerHeight,radiusPx*2));portal.style.left=`${Math.round(cx-sizePx/2)}px`;portal.style.top=`${Math.round(cy-sizePx/2)}px`;portal.style.width=portal.style.height=`${Math.round(sizePx)}px`;const gSize=Math.max(60,Math.min(110,sizePx*.2));glyph.style.left=portal.style.left;glyph.style.top=portal.style.top;glyph.style.width=portal.style.width;glyph.style.height=portal.style.height;glyph.querySelector('.hit').style.cssText=`width:${gSize}px;height:${gSize}px;left:${(sizePx-gSize)/2}px;top:${(sizePx-gSize)/2}px;border-radius:50%`;if(proc.width!==Math.round(sizePx))resizeProc(Math.round(sizePx));}
+
+    /* Interaction */
+    function setMode(m){
+      S.mode=m;
+      document.querySelectorAll('.btn[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));
+
+      // Define light properties and quote for each mode
+      let keyIntensity, flameIntensity, flameColor, coneOpacity;
+      let mysteriousBacklightIntensity, mysteriousBacklightColor, lightConeOpacity;
+      let ambientIntensity;
+      let fogColor, fogDensity;
+      let quoteText;
+
+      switch(m){
+        case 'wash':
+          S.spin=.26; S.wobble=.36;
+          statusEl.textContent='Status: Cleansing illusions'; cycleEl.textContent='Cycle: Wash';
+          keyIntensity = 0.2; flameIntensity = 1.15; flameColor = 0xd08b4a; coneOpacity = 0.04;
+          mysteriousBacklightIntensity = 15.0; mysteriousBacklightColor = 0xdfe6eb; lightConeOpacity = 0.03; // Standard, clear glow
+          ambientIntensity = 0.05;
+          fogColor = 0x07080a; fogDensity = 0.12;
+          quoteText = getComputedStyle(document.documentElement).getPropertyValue('--quote-wash');
+          break;
+        case 'rinse':
+          S.spin=.46; S.wobble=.24;
+          statusEl.textContent='Status: Clarifying perception'; cycleEl.textContent='Cycle: Rinse';
+          keyIntensity = 0.25; flameIntensity = 0.9; flameColor = 0xa8d9ff; coneOpacity = 0.08;
+          mysteriousBacklightIntensity = 18.0; mysteriousBacklightColor = 0xa8d9ff; lightConeOpacity = 0.04; // Brighter, cool blue glow
+          ambientIntensity = 0.07;
+          fogColor = 0x0a0c12; fogDensity = 0.115;
+          quoteText = getComputedStyle(document.documentElement).getPropertyValue('--quote-rinse');
+          break;
+        case 'spin':
+          S.spin=1.25; S.wobble=.6;
+          statusEl.textContent='Status: Accelerating truth'; cycleEl.textContent='Cycle: Spin';
+          keyIntensity = 0.3; flameIntensity = 1.8; flameColor = 0xffcc00; coneOpacity = 0.12;
+          mysteriousBacklightIntensity = 22.0; mysteriousBacklightColor = 0xffcc00; lightConeOpacity = 0.05; // Very bright, energetic yellow glow
+          ambientIntensity = 0.09;
+          fogColor = 0x070707; fogDensity = 0.13;
+          quoteText = getComputedStyle(document.documentElement).getPropertyValue('--quote-spin');
+          break;
+        case 'dry':
+          S.spin=.1; S.wobble=.08;
+          statusEl.textContent='Status: Crystallizing wisdom'; cycleEl.textContent='Cycle: Dry';
+          keyIntensity = 0.18; flameIntensity = 1.4; flameColor = 0xff9966; coneOpacity = 0.06;
+          mysteriousBacklightIntensity = 14.0; mysteriousBacklightColor = 0xff9966; lightConeOpacity = 0.03; // Softer, warm orange glow
+          ambientIntensity = 0.04;
+          fogColor = 0x060504; fogDensity = 0.12;
+          quoteText = getComputedStyle(document.documentElement).getPropertyValue('--quote-dry');
+          break;
+      }
+
+      // Apply light properties
+      key.intensity = keyIntensity;
+      flame.intensity = flameIntensity;
+      flame.color.set(flameColor);
+      cone.material.color.set(flameColor); // Keep cone color in sync with flame
+      cone.material.opacity = coneOpacity;
+
+      // Apply mysteriousBacklight properties
+      mysteriousBacklight.intensity = mysteriousBacklightIntensity;
+      mysteriousBacklight.color.set(mysteriousBacklightColor);
+
+      // Apply lightCone properties
+      lightCone.material.color.set(mysteriousBacklightColor);
+      lightCone.material.opacity = lightConeOpacity;
+      // Ensure lightCone always points from the spotlight to its target
+      lightCone.position.copy(mysteriousBacklight.position);
+      lightCone.lookAt(mysteriousBacklight.target.position);
+
+
+      // Apply ambient light properties
+      ambientLight.intensity = ambientIntensity;
+      ambientLight.color.set(fogColor); // Use a slightly adapted color for ambient for coherence
+
+      // Apply fog properties
+      scene.fog.color.set(fogColor);
+      scene.fog.density = fogDensity;
+
+      // Update panel quote
+      panelQuote.textContent = quoteText;
+    }
+
+    function togglePlay(){S.playing=!S.playing;const procEl=document.getElementById('proc');const toggleBtn=document.getElementById('toggle');if(S.playing){toggleBtn.classList.add('active');toggleBtn.textContent='Pause';statusEl.textContent='Status: Projecting shadows';glyph.classList.add('hidden');procEl.classList.add('hidden');videoWrap.classList.add('visible');try{tube.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}','*');tube.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}','*');}catch(e){}}else{toggleBtn.classList.remove('active');toggleBtn.textContent='Play';statusEl.textContent='Status: Meditation paused';glyph.classList.remove('hidden');videoWrap.classList.remove('visible');procEl.classList.remove('hidden');try{tube.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}','*');}catch(e){}}}
+
+    // Function to show a specific essay modal
+    function showEssayModal(essayId) {
+        document.querySelectorAll('.essay-page').forEach(page => {
+            page.classList.remove('visible');
+        });
+        document.getElementById(essayId).classList.add('visible');
+        essayModal.classList.add('visible');
+    }
+
+    // Initial enter action
+    document.getElementById('enter').addEventListener('click',()=>{
+      hero.classList.add('hidden');
+      panel.classList.add('visible');
+      statusEl.textContent='Status: Apparatus online';
+      setTimeout(()=>{statusEl.textContent='Status: Ready for illumination';},1000);
+      // Removed: setTimeout(()=>{if(!S.playing)togglePlay(); showEssayModal('dialogueEssay');},7000); // Auto-load essay removed
+    });
+
+    // Cycle buttons and their essays
+    document.querySelectorAll('.btn[data-mode]').forEach(b=>b.addEventListener('click',function(){
+        const mode = this.dataset.mode;
+        const essayId = this.dataset.essay;
+        setMode(mode);
+        showEssayModal(essayId);
+    }));
+
+    // Play button specific action (if it also has an essay)
+    document.getElementById('toggle').addEventListener('click',function() {
+        // Toggle play state first
+        togglePlay(); // This will update S.playing and video state
+
+        // Then decide on essay based on new play state
+        if (!S.playing) { // If it just paused, show the dialogue essay
+            showEssayModal(this.dataset.essay);
+        } else { // If it just started playing, hide any open essay
+             essayModal.classList.remove('visible');
+        }
+    });
+
+
+    // Manual button
+    document.getElementById('readManual').addEventListener('click',function(){
+        showEssayModal(this.dataset.essay);
+        panelQuote.textContent = getComputedStyle(document.documentElement).getPropertyValue('--quote-manual');
+    });
+
+    // Event listener for internal links within essays (e.g., from Manual to a Book)
+    document.getElementById('manualEssay').addEventListener('click', function(e) {
+        if (e.target.tagName === 'A' && e.target.dataset.essayLink) {
+            e.preventDefault();
+            showEssayModal(e.target.dataset.essayLink);
+        }
+    });
+
+
+    // Close essay modal
+    essayCloseBtn.addEventListener('click', () => {
+      essayModal.classList.remove('visible');
+    });
+    essayModal.addEventListener('click', (e) => { // Close when clicking outside content
+      if (e.target === essayModal) {
+        essayModal.classList.remove('visible');
+      }
+    });
+
+    let mx=0,my=0;addEventListener('pointermove',e=>{mx=(e.clientX/innerWidth-.5)*2;my=(e.clientY/innerHeight-.5)*2});
+
+    function animate(){requestAnimationFrame(animate);machine.rotation.z+=S.spin*.01;machine.rotation.x=Math.sin(performance.now()*.0012)*S.wobble*.1;machine.rotation.y=Math.cos(performance.now()*.0016)*S.wobble*.1;const flick=.7+Math.sin(performance.now()*.008+Math.sin(S.t))*.3+Math.random()*.06;flame.intensity=.9+flick*.7;cone.material.opacity=.03+flick*.04;
+        // Subtle flicker for the volumetric light cone
+        lightCone.material.opacity = (mysteriousBacklight.intensity / 22.0) * (0.025 + Math.random() * 0.01); // Base opacity scaled by intensity, plus small random flicker
+        lightCone.position.copy(mysteriousBacklight.position); // Ensure lightCone position is always synced
+        lightCone.lookAt(mysteriousBacklight.target.position); // Ensure lightCone orientation is always synced
+
+        camera.position.x+=(mx*1.0-camera.position.x)*.05;camera.position.y+=(-my*.7+.4-camera.position.y)*.05;camera.lookAt(0,0,0);updateOverlay();if(!document.getElementById('proc').classList.contains('hidden'))drawPortal();renderer.render(scene,camera);S.t+=1}
+    animate();
+
+    function onResize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);updateOverlay();}
+    addEventListener('resize',onResize);
+
+    setMode('wash'); // Initialize with wash mode
+
+    // Self-tests / sanity checks
+    console.assert(scene.children.includes(machine),'Test[3] Scene should contain the machine group');
+    console.assert(typeof updateOverlay==='function','Test[4] updateOverlay exists');
+    const sizeCheck=()=>{const d=parseFloat(getComputedStyle(portal).width)||0;console.assert(d>0 && d<Math.max(innerWidth,innerHeight),'Test[5] overlay diameter reasonable');};
+    sizeCheck();
+    const filterCheck=getComputedStyle(document.querySelector('.videoWrap iframe')).filter||'';console.assert(filterCheck.includes('grayscale'),'Test[6] projection is monochrome');
+    if(statusEl)statusEl.textContent='Self-test passed • Apparatus ready';
+  }
+  </script>
+
+</body>
+</html>
